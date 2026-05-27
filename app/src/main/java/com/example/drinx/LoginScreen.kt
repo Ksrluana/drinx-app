@@ -23,14 +23,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-// ============================================================
-// USUÁRIOS VÁLIDOS
-// Adicione quantos quiser nesta lista
-// ============================================================
-private val usuariosValidos = listOf(
-    Pair("usuario@drinx.com", "DRINX")
-)
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen(
@@ -41,8 +34,10 @@ fun LoginScreen(
     var senhaVisivel by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf("") }
     var mostrarCadastro by remember { mutableStateOf(false) }
+    var carregando by remember { mutableStateOf(false) }
 
-    // Tela de cadastro de novo usuário
+    val auth = FirebaseAuth.getInstance()
+
     if (mostrarCadastro) {
         CadastroUsuarioScreen(
             onVoltar = { mostrarCadastro = false },
@@ -64,10 +59,8 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
 
-            // Espaço para empurrar logo um pouco acima do centro
             Spacer(modifier = Modifier.weight(0.8f))
 
-            // Logo
             Image(
                 painter = painterResource(id = R.drawable.logo_app),
                 contentDescription = "Logo DRINX",
@@ -80,7 +73,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.weight(0.15f))
 
-            // Campo e-mail
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it; erro = "" },
@@ -102,7 +94,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Campo senha
             OutlinedTextField(
                 value = senha,
                 onValueChange = { senha = it; erro = "" },
@@ -132,7 +123,6 @@ fun LoginScreen(
                 )
             )
 
-            // Mensagem de erro
             if (erro.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -145,17 +135,27 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            // Botão Entrar — branco
             Button(
                 onClick = {
                     when {
                         email.isBlank() -> erro = "Preencha o e-mail."
                         senha.isBlank() -> erro = "Preencha a senha."
-                        !usuariosValidos.any { it.first == email && it.second == senha } ->
-                            erro = "E-mail ou senha incorretos."
-                        else -> onLoginSucesso()
+                        else -> {
+                            carregando = true
+
+                            auth.signInWithEmailAndPassword(email, senha)
+                                .addOnSuccessListener {
+                                    carregando = false
+                                    onLoginSucesso()
+                                }
+                                .addOnFailureListener {
+                                    carregando = false
+                                    erro = "E-mail ou senha incorretos."
+                                }
+                        }
                     }
                 },
+                enabled = !carregando,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -165,12 +165,15 @@ fun LoginScreen(
                     contentColor = Color.Black
                 )
             ) {
-                Text("Entrar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(
+                    text = if (carregando) "Entrando..." else "Entrar",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Botão Cadastrar — outlined branco
             OutlinedButton(
                 onClick = { mostrarCadastro = true },
                 modifier = Modifier
@@ -190,9 +193,6 @@ fun LoginScreen(
     }
 }
 
-// ============================================================
-// TELA DE CADASTRO DE NOVO USUÁRIO
-// ============================================================
 @Composable
 fun CadastroUsuarioScreen(
     onVoltar: () -> Unit,
@@ -204,6 +204,9 @@ fun CadastroUsuarioScreen(
     var senhaVisivel by remember { mutableStateOf(false) }
     var erro by remember { mutableStateOf("") }
     var sucesso by remember { mutableStateOf(false) }
+    var carregando by remember { mutableStateOf(false) }
+
+    val auth = FirebaseAuth.getInstance()
 
     Box(
         modifier = Modifier
@@ -248,15 +251,23 @@ fun CadastroUsuarioScreen(
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
+
                 Spacer(modifier = Modifier.height(20.dp))
+
                 Button(
                     onClick = onCadastroSucesso,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-                ) { Text("Ir para o Login", fontWeight = FontWeight.Bold) }
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Text("Ir para o Login", fontWeight = FontWeight.Bold)
+                }
             } else {
-                // Campo e-mail
                 OutlinedTextField(
                     value = novoEmail,
                     onValueChange = { novoEmail = it; erro = "" },
@@ -276,7 +287,6 @@ fun CadastroUsuarioScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Campo senha
                 OutlinedTextField(
                     value = novaSenha,
                     onValueChange = { novaSenha = it; erro = "" },
@@ -306,7 +316,6 @@ fun CadastroUsuarioScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Confirmar senha
                 OutlinedTextField(
                     value = confirmarSenha,
                     onValueChange = { confirmarSenha = it; erro = "" },
@@ -327,40 +336,63 @@ fun CadastroUsuarioScreen(
 
                 if (erro.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(erro, color = Color(0xFFFF6B6B), fontSize = 13.sp, textAlign = TextAlign.Center)
+                    Text(
+                        text = erro,
+                        color = Color(0xFFFF6B6B),
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Botão Cadastrar
                 Button(
                     onClick = {
                         when {
                             novoEmail.isBlank() -> erro = "Preencha o e-mail."
                             novaSenha.isBlank() -> erro = "Preencha a senha."
-                            novaSenha.length < 4 -> erro = "A senha deve ter pelo menos 4 caracteres."
+                            novaSenha.length < 6 -> erro = "A senha deve ter pelo menos 6 caracteres."
                             novaSenha != confirmarSenha -> erro = "As senhas não coincidem."
-                            usuariosValidos.any { it.first == novoEmail } -> erro = "Este e-mail já está cadastrado."
+
                             else -> {
-                                // Adiciona o novo usuário à lista em memória
-                                (usuariosValidos as? MutableList)?.add(Pair(novoEmail, novaSenha))
-                                sucesso = true
+                                carregando = true
+
+                                auth.createUserWithEmailAndPassword(novoEmail, novaSenha)
+                                    .addOnSuccessListener {
+                                        carregando = false
+                                        sucesso = true
+                                    }
+                                    .addOnFailureListener {
+                                        carregando = false
+                                        erro = "Erro ao criar conta. Verifique se o e-mail é válido."
+                                    }
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    enabled = !carregando,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    )
                 ) {
-                    Text("Criar conta", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(
+                        text = if (carregando) "Criando..." else "Criar conta",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Botão Voltar ao login
                 OutlinedButton(
                     onClick = onVoltar,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = ButtonDefaults.outlinedButtonBorder.copy(

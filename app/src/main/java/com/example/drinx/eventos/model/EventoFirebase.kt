@@ -1,6 +1,6 @@
 package com.example.drinx.eventos.model
 
-data class Evento(
+data class EventoFirebase(
     val id: String = "",
     val contratante: String = "",
     val cpfCnpj: String = "",

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "975645097112",
+    "project_id": "drinx-e70c7",
+    "storage_bucket": "drinx-e70c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:975645097112:android:0ff2c39265b7b6fd3c64ed",
+        "android_client_info": {
+          "package_name": "com.example.drinx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPZMnI2OUsy_4TUurjsdb8qV1n21MKygk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
