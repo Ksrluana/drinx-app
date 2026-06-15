@@ -21,14 +21,27 @@ enum class TelaAtualCadastro {
 }
 
 data class Pessoa(
-    val id: Int,
-    val tipoDocumento: TipoDocumento,
-    val documento: String,
-    val nome: String,
-    val email: String,
-    val contato: String,
-    val endereco: String,
-    val flag: FlagPessoa,
-    val situacao: SituacaoPessoa,
-    val observacao: String
+    val id: Int = 0,
+    val tipoDocumento: TipoDocumento = TipoDocumento.CPF,
+    val documento: String = "",
+    val nome: String = "",
+    val email: String = "",
+    val contato: String = "",
+    val endereco: String = "",
+    val flag: FlagPessoa = FlagPessoa.CLIENTE,
+    val situacao: SituacaoPessoa = SituacaoPessoa.ATIVO,
+    val observacao: String = ""
+)
+
+data class PessoaFirebase(
+    val id: Int = 0,
+    val tipoDocumento: String = "",
+    val documento: String = "",
+    val nome: String = "",
+    val email: String = "",
+    val contato: String = "",
+    val endereco: String = "",
+    val flag: String = "",
+    val situacao: String = "",
+    val observacao: String = ""
 )

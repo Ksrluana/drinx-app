@@ -16,7 +16,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,63 +35,35 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.drinx.R
 import com.example.drinx.estoque.model.Produto
-import com.example.drinx.estoque.model.UnidadeMedida
-
-// ============================================================
-// MODELOS
-// ============================================================
-
-data class IngredienteDrink(
-    val produto: Produto,
-    val quantidade: String
-)
-
-data class DrinkItem(
-    val id: Int,
-    val nome: String,
-    val desc: String,
-    val imagemUri: Uri? = null,
-    val ingredientes: List<IngredienteDrink> = emptyList()
-)
-
-// Produto placeholder usado quando o estoque está vazio
-private val produtoVazio = Produto(
-    id = -1,
-    nome = "Selecione um produto",
-    categoria = com.example.drinx.estoque.model.Categoria.OUTROS,
-    unidadeMedida = UnidadeMedida.UNIDADE,
-    medida = "",
-    quantidade = 0
-)
-
-// ============================================================
-// TELA PRINCIPAL
-// ============================================================
+import com.example.drinx.estoque.viewmodel.CardapioViewModel
+import com.example.drinx.estoque.viewmodel.DrinkFirebase
 
 @Composable
 fun CardapioScreen(
     onAbrirMenu: () -> Unit = {},
     produtosEstoque: List<Produto> = emptyList()
 ) {
-    val drinks = remember {
-        mutableStateListOf(
-            DrinkItem(1, "Mojito Especial", "Uma releitura luxuosa do clássico cubano. Combina hortelã fresca e limão taiti com rum branco premium."),
-            DrinkItem(2, "Negroni Clássico", "Equilíbrio perfeito entre Gin, Campari e Vermute. Um drink intenso e sofisticado para paladares apurados."),
-            DrinkItem(3, "Caipirinha Gourmet", "A versão premium da paixão nacional. Cachaça de alambique, limões selecionados e gelo cristalino."),
-            DrinkItem(4, "Cosmopolitan", "O ícone da sofisticação urbana. Vodka premium com toque cítrico do licor de laranja.")
-        )
-    }
+    val viewModel: CardapioViewModel = viewModel()
+    val drinks = viewModel.drinks
 
-    var selecionado by remember { mutableStateOf(drinks[0]) }
+    var drinkSelecionadoId by remember { mutableStateOf<Int?>(null) }
     var mostrarFormulario by remember { mutableStateOf(false) }
-    var drinkParaExcluir by remember { mutableStateOf<DrinkItem?>(null) }
-    var drinkParaEditar by remember { mutableStateOf<DrinkItem?>(null) }
+    var drinkParaExcluir by remember { mutableStateOf<DrinkFirebase?>(null) }
+    var drinkParaEditar by remember { mutableStateOf<DrinkFirebase?>(null) }
     var menuExpandido by remember { mutableStateOf(false) }
 
-    // Confirmação de exclusão
+    val selecionado = drinks.firstOrNull { it.id == drinkSelecionadoId } ?: drinks.firstOrNull()
+
+    LaunchedEffect(drinks.size) {
+        if (drinkSelecionadoId == null && drinks.isNotEmpty()) {
+            drinkSelecionadoId = drinks.first().id
+        }
+    }
+
     drinkParaExcluir?.let { drink ->
         AlertDialog(
             onDismissRequest = { drinkParaExcluir = null },
@@ -94,13 +71,12 @@ fun CardapioScreen(
             text = { Text("Tem certeza que quer excluir '${drink.nome}' do cardápio?") },
             confirmButton = {
                 TextButton(onClick = {
-                    val index = drinks.indexOf(drink)
-                    drinks.remove(drink)
-                    if (drinks.isNotEmpty()) {
-                        selecionado = if (index > 0) drinks[index - 1] else drinks[0]
-                    }
+                    viewModel.excluirDrink(drink.id)
                     drinkParaExcluir = null
-                }) { Text("Excluir", color = Color.Red, fontWeight = FontWeight.Bold) }
+                    drinkSelecionadoId = null
+                }) {
+                    Text("Excluir", color = Color.Red, fontWeight = FontWeight.Bold)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { drinkParaExcluir = null }) {
@@ -111,19 +87,17 @@ fun CardapioScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-        Column(modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)) {
-
-            // ===== TOPO =====
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White)
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(350.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                // Fundo preto curvado
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -131,7 +105,6 @@ fun CardapioScreen(
                         .clip(RoundedCornerShape(bottomStart = 150.dp, bottomEnd = 150.dp))
                         .background(Color(0xFF1A1A1A))
                 ) {
-                    // Logo
                     androidx.compose.foundation.Image(
                         painter = painterResource(id = R.drawable.logo_app),
                         contentDescription = "Logo DRINX",
@@ -142,7 +115,6 @@ fun CardapioScreen(
                         contentScale = ContentScale.Fit
                     )
 
-                    // Ícone hambúrguer
                     IconButton(
                         onClick = onAbrirMenu,
                         modifier = Modifier
@@ -152,7 +124,6 @@ fun CardapioScreen(
                         Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
                     }
 
-                    // Nome e subtítulo
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -160,25 +131,28 @@ fun CardapioScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = selecionado.nome,
-                            color = Color.White, fontSize = 28.sp,
+                            text = selecionado?.nome ?: "Cardápio",
+                            color = Color.White,
+                            fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center, maxLines = 1
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
                         )
                         Text("Drink em Destaque", color = Color.LightGray, fontSize = 14.sp)
                     }
                 }
 
-                // Imagem do drink selecionado
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(350.dp),
                     contentAlignment = Alignment.BottomCenter
                 ) {
-                    if (selecionado.imagemUri != null) {
+                    val imagem = selecionado?.imagemUri
+
+                    if (!imagem.isNullOrBlank()) {
                         AsyncImage(
-                            model = selecionado.imagemUri,
+                            model = Uri.parse(imagem),
                             contentDescription = selecionado.nome,
                             modifier = Modifier.size(250.dp),
                             contentScale = ContentScale.Fit
@@ -195,7 +169,6 @@ fun CardapioScreen(
                     }
                 }
 
-                // Menu 3 pontinhos
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -205,24 +178,33 @@ fun CardapioScreen(
                     IconButton(onClick = { menuExpandido = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
                     }
+
                     DropdownMenu(
                         expanded = menuExpandido,
                         onDismissRequest = { menuExpandido = false }
                     ) {
                         DropdownMenuItem(
                             text = { Text("Editar drink") },
-                            onClick = { drinkParaEditar = selecionado; menuExpandido = false }
+                            onClick = {
+                                selecionado?.let { drinkParaEditar = it }
+                                menuExpandido = false
+                            }
                         )
+
                         DropdownMenuItem(
                             text = { Text("Excluir drink", color = Color.Red) },
-                            onClick = { drinkParaExcluir = selecionado; menuExpandido = false }
+                            onClick = {
+                                selecionado?.let { drinkParaExcluir = it }
+                                menuExpandido = false
+                            }
                         )
                     }
                 }
             }
 
-            // ===== CONTEÚDO INFERIOR =====
-            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)) {
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+            ) {
                 Text("Todos os drinks", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
                 LazyRow(
@@ -231,11 +213,12 @@ fun CardapioScreen(
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
                     items(drinks) { drink ->
-                        val isSelected = selecionado.id == drink.id
+                        val isSelected = selecionado?.id == drink.id
+
                         Card(
                             modifier = Modifier
                                 .size(90.dp, 80.dp)
-                                .clickable { selecionado = drink },
+                                .clickable { drinkSelecionadoId = drink.id },
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White),
                             border = BorderStroke(
@@ -247,9 +230,9 @@ fun CardapioScreen(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                if (drink.imagemUri != null) {
+                                if (!drink.imagemUri.isNullOrBlank()) {
                                     AsyncImage(
-                                        model = drink.imagemUri,
+                                        model = Uri.parse(drink.imagemUri),
                                         contentDescription = null,
                                         modifier = Modifier.size(50.dp),
                                         contentScale = ContentScale.Fit
@@ -292,45 +275,26 @@ fun CardapioScreen(
                     }
                 }
 
-                Text("Descrição", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(
-                    text = selecionado.desc,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 8.dp),
-                    textAlign = TextAlign.Justify,
-                    lineHeight = 20.sp
-                )
-
-                // Ingredientes do drink selecionado
-                if (selecionado.ingredientes.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Ingredientes", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    selecionado.ingredientes.forEach { ing ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "• ${ing.produto.nome}",
-                                fontSize = 14.sp,
-                                color = Color.Black,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                "${ing.quantidade} ${ing.produto.unidadeMedida.label}",
-                                fontSize = 14.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
+                if (selecionado == null) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Nenhum drink cadastrado ainda.",
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                } else {
+                    Text("Descrição", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(
+                        text = selecionado.desc,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp),
+                        textAlign = TextAlign.Justify,
+                        lineHeight = 20.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Botões inferiores
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -339,15 +303,19 @@ fun CardapioScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
-                        onClick = { drinkParaEditar = selecionado },
+                        onClick = {
+                            selecionado?.let { drinkParaEditar = it }
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color.Black),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        enabled = selecionado != null
                     ) {
                         Text("Editar Drink", color = Color.White, fontWeight = FontWeight.Bold)
                     }
+
                     Surface(
                         modifier = Modifier
                             .size(50.dp)
@@ -367,42 +335,38 @@ fun CardapioScreen(
             }
         }
 
-        // ===== FORMULÁRIO NOVO DRINK =====
         AnimatedVisibility(visible = mostrarFormulario) {
             FormularioDrink(
                 titulo = "Novo Drink",
                 subtitulo = "Configure os detalhes do item",
                 drinkInicial = null,
-                produtosEstoque = produtosEstoque,
                 onCancelar = { mostrarFormulario = false },
-                onSalvar = { nome, desc, uri, ingredientes ->
-                    val novoId = if (drinks.isEmpty()) 1 else drinks.maxOf { it.id } + 1
-                    val novo = DrinkItem(novoId, nome, desc, uri, ingredientes)
-                    drinks.add(novo)
-                    selecionado = novo
+                onSalvar = { nome, desc, uri ->
+                    viewModel.adicionarDrink(
+                        nome = nome,
+                        desc = desc,
+                        imagemUri = uri?.toString()
+                    )
                     mostrarFormulario = false
                 }
             )
         }
 
-        // ===== FORMULÁRIO EDIÇÃO =====
         drinkParaEditar?.let { drink ->
             FormularioDrink(
                 titulo = "Editar Drink",
                 subtitulo = drink.nome,
                 drinkInicial = drink,
-                produtosEstoque = produtosEstoque,
                 onCancelar = { drinkParaEditar = null },
-                onSalvar = { nome, desc, uri, ingredientes ->
-                    val index = drinks.indexOfFirst { it.id == drink.id }
-                    if (index != -1) {
-                        val atualizado = drink.copy(
-                            nome = nome, desc = desc,
-                            imagemUri = uri, ingredientes = ingredientes
-                        )
-                        drinks[index] = atualizado
-                        selecionado = atualizado
-                    }
+                onSalvar = { nome, desc, uri ->
+                    val atualizado = drink.copy(
+                        nome = nome,
+                        desc = desc,
+                        imagemUri = uri?.toString()
+                    )
+
+                    viewModel.atualizarDrink(atualizado)
+                    drinkSelecionadoId = atualizado.id
                     drinkParaEditar = null
                 }
             )
@@ -410,47 +374,30 @@ fun CardapioScreen(
     }
 }
 
-// ============================================================
-// FORMULÁRIO DE CADASTRO / EDIÇÃO
-// ============================================================
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormularioDrink(
     titulo: String,
     subtitulo: String,
-    drinkInicial: DrinkItem?,
-    produtosEstoque: List<Produto>,
+    drinkInicial: DrinkFirebase?,
     onCancelar: () -> Unit,
-    onSalvar: (nome: String, desc: String, uri: Uri?, ingredientes: List<IngredienteDrink>) -> Unit
+    onSalvar: (nome: String, desc: String, uri: Uri?) -> Unit
 ) {
-    var novoNome by remember(drinkInicial) { mutableStateOf(drinkInicial?.nome ?: "") }
-    var novaDesc by remember(drinkInicial) { mutableStateOf(drinkInicial?.desc ?: "") }
-    var imagemUri by remember(drinkInicial) { mutableStateOf<Uri?>(drinkInicial?.imagemUri) }
-    var qtdIngredientesTexto by remember(drinkInicial) {
-        mutableStateOf(drinkInicial?.ingredientes?.size?.takeIf { it > 0 }?.toString() ?: "")
+    var novoNome by remember(drinkInicial) {
+        mutableStateOf(drinkInicial?.nome ?: "")
     }
 
-    // Lista tipada explicitamente
-    var ingredientes by remember(drinkInicial) {
-        mutableStateOf<List<IngredienteDrink>>(drinkInicial?.ingredientes ?: emptyList())
+    var novaDesc by remember(drinkInicial) {
+        mutableStateOf(drinkInicial?.desc ?: "")
     }
 
-    val produtoDefault = produtosEstoque.firstOrNull() ?: produtoVazio
-
-    // Atualiza a lista quando o usuário muda a quantidade
-    fun atualizarQuantidadeIngredientes(novaQtd: Int) {
-        val listaAtual = ingredientes.toMutableList()
-        while (listaAtual.size < novaQtd) {
-            listaAtual.add(IngredienteDrink(produto = produtoDefault, quantidade = ""))
-        }
-        while (listaAtual.size > novaQtd) {
-            listaAtual.removeAt(listaAtual.size - 1)
-        }
-        ingredientes = listaAtual
+    var imagemUri by remember(drinkInicial) {
+        mutableStateOf(
+            drinkInicial?.imagemUri?.let {
+                if (it.isNotBlank()) Uri.parse(it) else null
+            }
+        )
     }
 
-    // Launcher para galeria
     val galeriaLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -469,7 +416,6 @@ fun FormularioDrink(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Área de imagem (abre galeria)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -497,6 +443,7 @@ fun FormularioDrink(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
+
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -505,7 +452,12 @@ fun FormularioDrink(
                             .clickable { imagemUri = null }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Text("Remover", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Remover",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -529,104 +481,9 @@ fun FormularioDrink(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Campo de quantidade de ingredientes
-            Text("Ingredientes", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = qtdIngredientesTexto,
-                onValueChange = { novo ->
-                    qtdIngredientesTexto = novo
-                    val qtd = novo.toIntOrNull() ?: 0
-                    atualizarQuantidadeIngredientes(qtd)
-                },
-                label = { Text("Quantos ingredientes?") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
-            )
-
-            // Campos dinâmicos de ingredientes
-            if (ingredientes.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (produtosEstoque.isEmpty()) {
-                    Text(
-                        "⚠️ Nenhum produto cadastrado no estoque ainda.",
-                        color = Color.Gray, fontSize = 12.sp
-                    )
-                } else {
-                    ingredientes.forEachIndexed { index, ingrediente ->
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "Ingrediente ${index + 1}",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Dropdown de produto do estoque
-                        var dropdownAberto by remember { mutableStateOf(false) }
-
-                        ExposedDropdownMenuBox(
-                            expanded = dropdownAberto,
-                            onExpandedChange = { dropdownAberto = it }
-                        ) {
-                            OutlinedTextField(
-                                value = ingrediente.produto.nome,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Produto do estoque") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownAberto)
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                            ExposedDropdownMenu(
-                                expanded = dropdownAberto,
-                                onDismissRequest = { dropdownAberto = false }
-                            ) {
-                                produtosEstoque.forEach { produto ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text("${produto.nome} (${produto.unidadeMedida.label})")
-                                        },
-                                        onClick = {
-                                            val lista = ingredientes.toMutableList()
-                                            lista[index] = ingrediente.copy(produto = produto)
-                                            ingredientes = lista
-                                            dropdownAberto = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        OutlinedTextField(
-                            value = ingrediente.quantidade,
-                            onValueChange = { qtd ->
-                                val lista = ingredientes.toMutableList()
-                                lista[index] = ingrediente.copy(quantidade = qtd)
-                                ingredientes = lista
-                            },
-                            label = { Text("Quantidade (${ingrediente.produto.unidadeMedida.label})") },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                    }
-                }
-            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -649,7 +506,7 @@ fun FormularioDrink(
                 Button(
                     onClick = {
                         if (novoNome.isNotBlank()) {
-                            onSalvar(novoNome, novaDesc, imagemUri, ingredientes)
+                            onSalvar(novoNome, novaDesc, imagemUri)
                         }
                     },
                     modifier = Modifier
